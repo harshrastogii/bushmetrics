@@ -1,0 +1,44 @@
+[
+  {
+    "cluster":0,
+    "total_km2":7783.2036770043,
+    "protected_km2":1246.1388378231,
+    "pct_protected":16.0106158021,
+    "cluster_name":"Melaleuca floodplain wetlands"
+  },
+  {
+    "cluster":1,
+    "total_km2":77025.4617679714,
+    "protected_km2":13134.2320327149,
+    "pct_protected":17.0518056383,
+    "cluster_name":"Eucalypt tall woodlands"
+  },
+  {
+    "cluster":2,
+    "total_km2":22553.2942518717,
+    "protected_km2":2082.4649296124,
+    "pct_protected":9.2335288422,
+    "cluster_name":"Rugged sandstone country"
+  },
+  {
+    "cluster":3,
+    "total_km2":21575.0684109851,
+    "protected_km2":1579.0313313343,
+    "pct_protected":7.3187778655,
+    "cluster_name":"Callitris sandplains"
+  },
+  {
+    "cluster":4,
+    "total_km2":7774.7047327348,
+    "protected_km2":944.5753168566,
+    "pct_protected":12.1493400628,
+    "cluster_name":"Tidal\/mangrove coast"
+  },
+  {
+    "cluster":5,
+    "total_km2":1210339.542852706,
+    "protected_km2":49740.9577671346,
+    "pct_protected":4.1096697254,
+    "cluster_name":"Arid open woodland \/ spinifex"
+  }
+]

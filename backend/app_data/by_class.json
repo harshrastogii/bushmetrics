@@ -1,0 +1,134 @@
+[
+  {
+    "CLASS":"limestone hills",
+    "total_km2":10440.7148850023,
+    "protected_km2":3476.1196619551,
+    "pct_protected":33.2938855264
+  },
+  {
+    "CLASS":"rugged quartz sandstone plateaux and hills",
+    "total_km2":71392.1825410896,
+    "protected_km2":15772.8875700655,
+    "pct_protected":22.0932979055
+  },
+  {
+    "CLASS":"coastal floodplains",
+    "total_km2":12453.7093571654,
+    "protected_km2":2453.3198007981,
+    "pct_protected":19.6995106473
+  },
+  {
+    "CLASS":"granite ranges",
+    "total_km2":11778.9034612278,
+    "protected_km2":1578.8361261348,
+    "pct_protected":13.4039312856
+  },
+  {
+    "CLASS":"elevated plateaux surfaces",
+    "total_km2":16641.0240015735,
+    "protected_km2":2122.2919056104,
+    "pct_protected":12.7533732624
+  },
+  {
+    "CLASS":"sandstone ranges",
+    "total_km2":22538.3010926915,
+    "protected_km2":2779.6664482932,
+    "pct_protected":12.3330788637
+  },
+  {
+    "CLASS":"tidal flats",
+    "total_km2":10485.4315813988,
+    "protected_km2":1091.6562965865,
+    "pct_protected":10.4111718064
+  },
+  {
+    "CLASS":"sandstone hills",
+    "total_km2":50229.2880330089,
+    "protected_km2":4570.1259439259,
+    "pct_protected":9.0985282151
+  },
+  {
+    "CLASS":"lateritic plateaux",
+    "total_km2":18161.8066273053,
+    "protected_km2":1530.8780472115,
+    "pct_protected":8.4291066336
+  },
+  {
+    "CLASS":"sandstone plains and rises",
+    "total_km2":94137.920190657,
+    "protected_km2":7597.0696188709,
+    "pct_protected":8.0701481438
+  },
+  {
+    "CLASS":"alluvial floodplains",
+    "total_km2":86885.17424245,
+    "protected_km2":5327.9183836365,
+    "pct_protected":6.1321375368
+  },
+  {
+    "CLASS":"lateritic plains and rises",
+    "total_km2":234695.3686223804,
+    "protected_km2":12356.8598310267,
+    "pct_protected":5.2650633472
+  },
+  {
+    "CLASS":"granite hills",
+    "total_km2":10422.1471581455,
+    "protected_km2":459.9861629227,
+    "pct_protected":4.413545078
+  },
+  {
+    "CLASS":"basalt hills",
+    "total_km2":18404.3087432333,
+    "protected_km2":800.7121197007,
+    "pct_protected":4.350677501
+  },
+  {
+    "CLASS":"coastal dunes",
+    "total_km2":4266.0082915241,
+    "protected_km2":161.3079871312,
+    "pct_protected":3.7812394189
+  },
+  {
+    "CLASS":"granite plains and rises",
+    "total_km2":34215.2919296571,
+    "protected_km2":1276.9174006522,
+    "pct_protected":3.7320079083
+  },
+  {
+    "CLASS":"basalt plains and rises",
+    "total_km2":18856.0315166969,
+    "protected_km2":592.650250792,
+    "pct_protected":3.1430274725
+  },
+  {
+    "CLASS":"limestone plains and rises",
+    "total_km2":45270.5730047358,
+    "protected_km2":722.4048922617,
+    "pct_protected":1.5957493893
+  },
+  {
+    "CLASS":"clay plains",
+    "total_km2":82691.9837687669,
+    "protected_km2":1256.9520536113,
+    "pct_protected":1.5200409959
+  },
+  {
+    "CLASS":"desert dunefields",
+    "total_km2":224929.4946778892,
+    "protected_km2":2096.2920184197,
+    "pct_protected":0.9319773831
+  },
+  {
+    "CLASS":"desert sandplains",
+    "total_km2":258123.6661878954,
+    "protected_km2":702.5476958693,
+    "pct_protected":0.2721748479
+  },
+  {
+    "CLASS":"salt pans",
+    "total_km2":10031.9457787788,
+    "protected_km2":0.0,
+    "pct_protected":0.0
+  }
+]

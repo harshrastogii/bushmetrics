@@ -1,0 +1,15 @@
+# Large raw data — not for GitHub
+data/
+app_data/
+# Python
+__pycache__/
+*.pyc
+# Notebook checkpoints
+.ipynb_checkpoints/
+# Mac
+.DS_Store
+# Node
+node_modules/
+dist/
+!backend/app_data/
+!backend/app_data/*
