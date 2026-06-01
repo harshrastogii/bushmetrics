@@ -48,6 +48,10 @@ Three open datasets from the [NT Government Open Data Portal](https://data.nt.go
 All published in GDA94 (EPSG:4283); areas computed after reprojection to Australian
 Albers (EPSG:3577), an equal-area projection.
 
+*Data snapshot retrieved June 2026; the analysis and the live app reflect the portal as
+of that date. The underlying datasets (land systems, parks) are slow-changing, so the
+snapshot remains representative.*
+
 ## Method
 
 End to end, from raw spatial files to statistical conclusion:
