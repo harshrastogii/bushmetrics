@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { MapContainer, TileLayer, GeoJSON } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
-import { getBioregions } from "./api";
+import { getBioregions, askQuestion } from "./api";
 import "./App.css";
 
 const NT_AVERAGE = 5.1;
@@ -33,24 +33,62 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState("protection");
 
+  // Search state
+  const [query, setQuery] = useState("");
+  const [asking, setAsking] = useState(false);
+  const [answer, setAnswer] = useState(null);          // {ok, results, message}
+  const [highlight, setHighlight] = useState(null);    // array of region names to highlight
+
   useEffect(() => {
     getBioregions()
       .then((d) => { setData(d); setLoading(false); })
       .catch((e) => { setError(e.message); setLoading(false); });
   }, []);
 
+  async function runQuery(e) {
+    e.preventDefault();
+    if (!query.trim()) return;
+    setAsking(true);
+    setAnswer(null);
+    setHighlight(null);
+    try {
+      const res = await askQuestion(query);
+      setAnswer(res);
+      if (res.ok && res.names) setHighlight(res.names);
+    } catch {
+      setAnswer({ ok: false, message: "Something went wrong. Try again." });
+    }
+    setAsking(false);
+  }
+
+  function clearQuery() {
+    setQuery(""); setAnswer(null); setHighlight(null);
+  }
+
   const styleFn = (feature) => {
     const p = feature.properties;
-    const fill = view === "protection" ? colorForPct(p.pct_protected) : colorForGi(p.gi_class);
-    return { fillColor: fill, weight: 1, color: "#444", fillOpacity: 0.75 };
+    const base = view === "protection" ? colorForPct(p.pct_protected) : colorForGi(p.gi_class);
+    // If a search is active, dim everything not in the highlight set
+    if (highlight) {
+      const isMatch = highlight.includes(p.GEO_ZONE);
+      return {
+        fillColor: base,
+        weight: isMatch ? 2.5 : 0.5,
+        color: isMatch ? "#111" : "#999",
+        fillOpacity: isMatch ? 0.92 : 0.12,
+      };
+    }
+    return { fillColor: base, weight: 1, color: "#444", fillOpacity: 0.75 };
   };
+
   const onEach = (feature, layer) => {
     layer.on({
       click: () => setSelected(feature.properties),
       mouseover: (e) => e.target.setStyle({ weight: 3, color: "#000" }),
-      mouseout: (e) => e.target.setStyle({ weight: 1, color: "#444" }),
+      mouseout: (e) => e.target.setStyle({ weight: highlight && !highlight.includes(feature.properties.GEO_ZONE) ? 0.5 : 1, color: "#444" }),
     });
   };
+
   const v = selected ? verdict(selected.pct_protected) : null;
 
   return (
@@ -62,32 +100,29 @@ export default function App() {
             The NT protects its scenic northern country far more than its vast arid interior.
             This map shows how much of each region is inside a park or reserve.
           </p>
-          <p className="sub">
-            Based on 16,831 land-system polygons and 217 protected areas from the NT Open Data Portal.
-          </p>
+
+          {/* AI search box */}
+          <form className="search" onSubmit={runQuery}>
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Ask a question, e.g. which regions are least protected?"
+            />
+            <button type="submit" disabled={asking}>{asking ? "…" : "Ask"}</button>
+            {answer && <button type="button" className="clear" onClick={clearQuery}>Clear</button>}
+          </form>
+
           <div className="toggle">
-            <button className={view === "protection" ? "on" : ""} onClick={() => setView("protection")}>
-              % Protected
-            </button>
-            <button className={view === "hotspot" ? "on" : ""} onClick={() => setView("hotspot")}>
-              Statistical hot / cold spots
-            </button>
+            <button className={view === "protection" ? "on" : ""} onClick={() => setView("protection")}>% Protected</button>
+            <button className={view === "hotspot" ? "on" : ""} onClick={() => setView("hotspot")}>Statistical hot / cold spots</button>
           </div>
         </div>
 
         <div className="header-stats">
-          <div className="hstat">
-            <span className="hnum">{NT_AVERAGE}%</span>
-            <span className="hlabel">Territory-wide average protection</span>
-          </div>
-          <div className="hstat best">
-            <span className="hnum">33%</span>
-            <span className="hlabel">Best protected — limestone hills</span>
-          </div>
-          <div className="hstat worst">
-            <span className="hnum">0.6%</span>
-            <span className="hlabel">Tanami — the NT's largest region</span>
-          </div>
+          <div className="hstat"><span className="hnum">{NT_AVERAGE}%</span><span className="hlabel">Territory-wide average protection</span></div>
+          <div className="hstat best"><span className="hnum">33%</span><span className="hlabel">Best protected — limestone hills</span></div>
+          <div className="hstat worst"><span className="hnum">0.6%</span><span className="hlabel">Tanami — the NT's largest region</span></div>
         </div>
       </header>
 
@@ -96,15 +131,32 @@ export default function App() {
           {loading && <div className="loading">Loading map data… (first load may take ~30s while the server wakes)</div>}
           {error && <div className="error">Error: {error}</div>}
           <MapContainer center={[-19.5, 133.5]} zoom={5} style={{ height: "100%", width: "100%" }}>
-            <TileLayer
-              url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-              attribution="&copy; OpenStreetMap &copy; CARTO"
-            />
-            {data && <GeoJSON key={view} data={data} style={styleFn} onEachFeature={onEach} />}
+            <TileLayer url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" attribution="&copy; OpenStreetMap &copy; CARTO" />
+            {data && <GeoJSON key={view + (highlight ? "-hl" : "")} data={data} style={styleFn} onEachFeature={onEach} />}
           </MapContainer>
         </div>
 
         <aside className="panel">
+          {/* Search answer takes priority in the panel */}
+          {answer && (
+            <div className="answer">
+              <strong>Answer</strong>
+              {answer.ok ? (
+                <ol>
+                  {answer.results.map((r) => (
+                    <li key={r.name}>
+                      <span className="aname">{r.name}</span>
+                      <span className="apct">{r.pct_protected}%</span>
+                    </li>
+                  ))}
+                </ol>
+              ) : (
+                <p className="amsg">{answer.message}</p>
+              )}
+              <span className="ahint">Matching regions are highlighted on the map.</span>
+            </div>
+          )}
+
           {selected ? (
             <div className="detail">
               <h2>{selected.GEO_ZONE}</h2>
@@ -125,31 +177,25 @@ export default function App() {
               <div className="stat"><span>Statistical cluster</span><strong>{selected.gi_class}</strong></div>
             </div>
           ) : (
-            <p className="hint">👆 Click any region on the map to see its protection story.</p>
+            !answer && <p className="hint">👆 Click any region on the map, or ask a question above.</p>
           )}
 
           <div className="explainer">
             <strong>What you're seeing</strong>
             {view === "protection" ? (
-              <p>Each region is shaded by the share of its area inside a park or reserve.
-              Green is well protected, red is barely protected. Most of the red sits in the arid south.</p>
+              <p>Each region is shaded by the share of its area inside a park or reserve. Green is well protected, red is barely protected. Most of the red sits in the arid south.</p>
             ) : (
-              <p>Statistically significant clusters (Getis-Ord Gi*). Red regions sit in a
-              neighbourhood of high protection, blue in a neighbourhood of low protection,
-              grey shows no significant pattern.</p>
+              <p>Statistically significant clusters (Getis-Ord Gi*). Red regions sit in a neighbourhood of high protection, blue in a neighbourhood of low protection, grey shows no significant pattern.</p>
             )}
           </div>
 
           <div className="legend">
             <h3>{view === "protection" ? "% Protected" : "Gi* cluster"}</h3>
             {view === "protection"
-              ? [[">= 25", "#1a9850"], ["15–25", "#91cf60"], ["7–15", "#d9ef8b"],
-                 ["2–7", "#fee08b"], ["0.5–2", "#fc8d59"], ["< 0.5", "#d73027"]].map(([label, c]) => (
-                  <div className="legend-row" key={label}><span className="swatch" style={{ background: c }} /> {label}</div>
-                ))
+              ? [[">= 25", "#1a9850"], ["15–25", "#91cf60"], ["7–15", "#d9ef8b"], ["2–7", "#fee08b"], ["0.5–2", "#fc8d59"], ["< 0.5", "#d73027"]].map(([label, c]) => (
+                  <div className="legend-row" key={label}><span className="swatch" style={{ background: c }} /> {label}</div>))
               : [["Hot spot (high)", "#c0392b"], ["Cold spot (low)", "#2980b9"], ["Not significant", "#d5d5d5"]].map(([label, c]) => (
-                  <div className="legend-row" key={label}><span className="swatch" style={{ background: c }} /> {label}</div>
-                ))}
+                  <div className="legend-row" key={label}><span className="swatch" style={{ background: c }} /> {label}</div>))}
           </div>
 
           <div className="footer-note">
