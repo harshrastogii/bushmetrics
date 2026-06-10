@@ -93,3 +93,5 @@ header h1 { margin: 0 0 8px; font-family: 'Fraunces', serif; font-size: 26px; fo
   .hstat { width: 100%; }
   .hero-stat .num { font-size: 44px; }
 }
+
+.meaning { font-size: 12.5px; line-height: 1.5; color: #5a6a62; background: #f0ede5; padding: 10px 12px; border-radius: 8px; margin: -8px 0 18px; }

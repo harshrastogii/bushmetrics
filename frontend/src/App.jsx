@@ -115,6 +115,11 @@ export default function App() {
                 <span className="caption">protected</span>
               </div>
               <div className="ref">NT-wide average is {NT_AVERAGE}%</div>
+              <p className="meaning">
+                This means {selected.pct_protected.toFixed(1)}% of {selected.GEO_ZONE}'s land area
+                sits inside a national park or reserve. The remaining
+                {" "}{(100 - selected.pct_protected).toFixed(1)}% has no conservation protection status.
+              </p>
               <div className="stat"><span>Total area</span><strong>{Math.round(selected.total_km2).toLocaleString()} km²</strong></div>
               <div className="stat"><span>Protected area</span><strong>{Math.round(selected.protected_km2).toLocaleString()} km²</strong></div>
               <div className="stat"><span>Statistical cluster</span><strong>{selected.gi_class}</strong></div>
