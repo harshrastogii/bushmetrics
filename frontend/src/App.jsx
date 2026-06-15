@@ -1,10 +1,12 @@
-import { useEffect, useState } from "react";
-import { MapContainer, TileLayer, GeoJSON } from "react-leaflet";
+import { useEffect, useState, useRef } from "react";
+import { MapContainer, TileLayer, GeoJSON, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import { getBioregions, askQuestion } from "./api";
 import "./App.css";
 
 const NT_AVERAGE = 5.1;
+const NT_CENTER = [-19.5, 133.5];
+const NT_ZOOM = 5;
 
 function colorForPct(pct) {
   if (pct >= 25) return "#1a9850";
@@ -26,12 +28,24 @@ function verdict(pct) {
   return { text: "Almost no protection", tone: "bad" };
 }
 
+/* Imperatively fit the map back to the NT extent without disturbing map state */
+function MapController({ resetSignal }) {
+  const map = useMap();
+  const first = useRef(true);
+  useEffect(() => {
+    if (first.current) { first.current = false; return; }
+    map.flyTo(NT_CENTER, NT_ZOOM, { duration: 0.6 });
+  }, [resetSignal, map]);
+  return null;
+}
+
 export default function App() {
   const [data, setData] = useState(null);
   const [selected, setSelected] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState("protection");
+  const [resetSignal, setResetSignal] = useState(0);
 
   // Search state
   const [query, setQuery] = useState("");
@@ -90,61 +104,110 @@ export default function App() {
   };
 
   const v = selected ? verdict(selected.pct_protected) : null;
+  // Meter scale capped at 35% (matches best-protected class) for readable bars
+  const meterMax = 35;
+  const meterPct = selected ? Math.min(100, (selected.pct_protected / meterMax) * 100) : 0;
+  const avgPct = (NT_AVERAGE / meterMax) * 100;
 
   return (
     <div className="app">
       <header>
         <div className="header-text">
-          <h1>Northern Territory — Protected Area Coverage</h1>
+          <p className="eyebrow"><span className="dot" aria-hidden="true" /> Environmental Intelligence · Northern Territory</p>
+          <h1>Protected-Area Coverage Explorer</h1>
           <p className="lede">
             The NT protects its scenic northern country far more than its vast arid interior.
-            This map shows how much of each region is inside a park or reserve.
+            This map shows how much of each region sits inside a <strong>park or reserve</strong>.
           </p>
+        </div>
 
-          {/* AI search box */}
-          <form className="search" onSubmit={runQuery}>
+        <div className="header-stats" role="group" aria-label="Territory-wide summary statistics">
+          <div className="hstat animate-rise stagger-1"><span className="hnum">{NT_AVERAGE}%</span><span className="hlabel">Territory-wide average protection</span></div>
+          <div className="hstat best animate-rise stagger-2"><span className="hnum">33%</span><span className="hlabel">Best protected — limestone hills</span></div>
+          <div className="hstat worst animate-rise stagger-3"><span className="hnum">0.6%</span><span className="hlabel">Tanami — the NT's largest region</span></div>
+        </div>
+      </header>
+
+      {/* Toolbar: search + view toggle */}
+      <div className="toolbar">
+        <form className="search" onSubmit={runQuery} role="search">
+          <div className="search-field">
+            <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+              <circle cx="11" cy="11" r="7" /><path d="m20 20-3-3" strokeLinecap="round" />
+            </svg>
+            <label htmlFor="ask" className="sr-only">Ask a question about NT bioregions</label>
             <input
+              id="ask"
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Ask a question, e.g. which regions are least protected?"
             />
-            <button type="submit" disabled={asking}>{asking ? "…" : "Ask"}</button>
-            {answer && <button type="button" className="clear" onClick={clearQuery}>Clear</button>}
-          </form>
-
-          <div className="toggle">
-            <button className={view === "protection" ? "on" : ""} onClick={() => setView("protection")}>% Protected</button>
-            <button className={view === "hotspot" ? "on" : ""} onClick={() => setView("hotspot")}>Statistical hot / cold spots</button>
           </div>
-        </div>
+          <button type="submit" className="btn btn-primary" disabled={asking}>{asking ? "Asking…" : "Ask"}</button>
+          {answer && <button type="button" className="btn btn-ghost" onClick={clearQuery}>Clear</button>}
+        </form>
 
-        <div className="header-stats">
-          <div className="hstat"><span className="hnum">{NT_AVERAGE}%</span><span className="hlabel">Territory-wide average protection</span></div>
-          <div className="hstat best"><span className="hnum">33%</span><span className="hlabel">Best protected — limestone hills</span></div>
-          <div className="hstat worst"><span className="hnum">0.6%</span><span className="hlabel">Tanami — the NT's largest region</span></div>
+        <div className="toggle" role="tablist" aria-label="Map view">
+          <button role="tab" aria-selected={view === "protection"} className={view === "protection" ? "on" : ""} onClick={() => setView("protection")}>% Protected</button>
+          <button role="tab" aria-selected={view === "hotspot"} className={view === "hotspot" ? "on" : ""} onClick={() => setView("hotspot")}>Hot / cold spots</button>
         </div>
-      </header>
+      </div>
 
       <div className="layout">
         <div className="map-wrap">
-          {loading && <div className="loading">Loading map data… (first load may take ~30s while the server wakes)</div>}
-          {error && <div className="error">Error: {error}</div>}
-          <MapContainer center={[-19.5, 133.5]} zoom={5} style={{ height: "100%", width: "100%" }}>
+          {loading && (
+            <div className="loading" role="status">
+              <div className="spinner" aria-hidden="true" />
+              <div>Loading map data…</div>
+              <div className="sub-note">First load may take ~30s while the server wakes.</div>
+            </div>
+          )}
+          {error && (
+            <div className="error" role="alert">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 8v4M12 16h.01" strokeLinecap="round" /></svg>
+              <span>Error: {error}</span>
+            </div>
+          )}
+
+          {data && !loading && (
+            <div className="map-control">
+              <button onClick={() => setResetSignal((s) => s + 1)} aria-label="Reset map to Northern Territory extent">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                  <path d="M3 12a9 9 0 1 0 9-9 9 9 0 0 0-6.4 2.6L3 8" strokeLinecap="round" strokeLinejoin="round" /><path d="M3 4v4h4" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                Fit to NT
+              </button>
+            </div>
+          )}
+
+          <MapContainer center={NT_CENTER} zoom={NT_ZOOM} style={{ height: "100%", width: "100%" }}>
+            <MapController resetSignal={resetSignal} />
             <TileLayer url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" attribution="&copy; OpenStreetMap &copy; CARTO" />
             {data && <GeoJSON key={view + (highlight ? "-hl" : "")} data={data} style={styleFn} onEachFeature={onEach} />}
           </MapContainer>
         </div>
 
-        <aside className="panel">
+        <aside className="panel" aria-label="Region details and legend">
+          {/* Skeleton while the dataset loads */}
+          {loading && (
+            <div className="skeleton" aria-hidden="true">
+              <div className="sk-line sm" />
+              <div className="sk-line lg" />
+              <div className="sk-line" />
+              <div className="sk-line sm" />
+            </div>
+          )}
+
           {/* Search answer takes priority in the panel */}
           {answer && (
-            <div className="answer">
-              <strong>Answer</strong>
+            <div className="card answer animate-rise">
+              <span className="card-label">Answer</span>
               {answer.ok ? (
                 <ol>
                   {answer.results.map((r) => (
                     <li key={r.name}>
+                      <span className="rank" aria-hidden="true" />
                       <span className="aname">{r.name}</span>
                       <span className="apct">{r.pct_protected}%</span>
                     </li>
@@ -158,7 +221,7 @@ export default function App() {
           )}
 
           {selected ? (
-            <div className="detail">
+            <div className="card detail animate-rise" key={selected.GEO_ZONE}>
               <h2>{selected.GEO_ZONE}</h2>
               <div className={`verdict ${v.tone}`}>{v.text}</div>
               <div className="hero-stat">
@@ -166,42 +229,63 @@ export default function App() {
                 <span className="unit">%</span>
                 <span className="caption">protected</span>
               </div>
-              <div className="ref">NT-wide average is {NT_AVERAGE}%</div>
+
+              {/* Coverage meter with NT-average reference tick */}
+              <div className="meter" role="img" aria-label={`${selected.pct_protected.toFixed(1)} percent protected, on a scale to ${meterMax} percent`}>
+                <div className="meter-fill" style={{ width: `${meterPct}%`, background: colorForPct(selected.pct_protected) }} />
+              </div>
+              <div className="meter-avg">
+                <div className="tick" style={{ left: `${avgPct}%` }} />
+                <div className="tick-label" style={{ left: `${avgPct}%` }}>NT avg {NT_AVERAGE}%</div>
+              </div>
+
               <p className="meaning">
-                This means {selected.pct_protected.toFixed(1)}% of {selected.GEO_ZONE}'s land area
-                sits inside a national park or reserve. The remaining
-                {" "}{(100 - selected.pct_protected).toFixed(1)}% has no conservation protection status.
+                {selected.pct_protected.toFixed(1)}% of {selected.GEO_ZONE}'s land area sits inside a
+                national park or reserve. The remaining {(100 - selected.pct_protected).toFixed(1)}% has
+                no conservation protection status.
               </p>
               <div className="stat"><span>Total area</span><strong>{Math.round(selected.total_km2).toLocaleString()} km²</strong></div>
               <div className="stat"><span>Protected area</span><strong>{Math.round(selected.protected_km2).toLocaleString()} km²</strong></div>
               <div className="stat"><span>Statistical cluster</span><strong>{selected.gi_class}</strong></div>
             </div>
           ) : (
-            !answer && <p className="hint">👆 Click any region on the map, or ask a question above.</p>
+            !answer && !loading && (
+              <div className="hint animate-fade">
+                <svg className="hint-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+                  <path d="M9 11a3 3 0 1 0 6 0 3 3 0 0 0-6 0Z" /><path d="M17.6 6.4 12 12" strokeLinecap="round" />
+                  <path d="M12 2v2M12 20v2M2 12h2M20 12h2" strokeLinecap="round" />
+                </svg>
+                Click any region on the map, or ask a question above to explore protection coverage.
+              </div>
+            )
           )}
 
-          <div className="explainer">
-            <strong>What you're seeing</strong>
-            {view === "protection" ? (
-              <p>Each region is shaded by the share of its area inside a park or reserve. Green is well protected, red is barely protected. Most of the red sits in the arid south.</p>
-            ) : (
-              <p>Statistically significant clusters (Getis-Ord Gi*). Red regions sit in a neighbourhood of high protection, blue in a neighbourhood of low protection, grey shows no significant pattern.</p>
-            )}
-          </div>
+          {!loading && (
+            <>
+              <div className="card explainer animate-fade">
+                <span className="card-label">What you're seeing</span>
+                {view === "protection" ? (
+                  <p>Each region is shaded by the share of its area inside a park or reserve. Green is well protected, red is barely protected. Most of the red sits in the arid south.</p>
+                ) : (
+                  <p>Statistically significant clusters (Getis-Ord Gi*). Red regions sit in a neighbourhood of high protection, blue in a neighbourhood of low protection, grey shows no significant pattern.</p>
+                )}
+              </div>
 
-          <div className="legend">
-            <h3>{view === "protection" ? "% Protected" : "Gi* cluster"}</h3>
-            {view === "protection"
-              ? [[">= 25", "#1a9850"], ["15–25", "#91cf60"], ["7–15", "#d9ef8b"], ["2–7", "#fee08b"], ["0.5–2", "#fc8d59"], ["< 0.5", "#d73027"]].map(([label, c]) => (
-                  <div className="legend-row" key={label}><span className="swatch" style={{ background: c }} /> {label}</div>))
-              : [["Hot spot (high)", "#c0392b"], ["Cold spot (low)", "#2980b9"], ["Not significant", "#d5d5d5"]].map(([label, c]) => (
-                  <div className="legend-row" key={label}><span className="swatch" style={{ background: c }} /> {label}</div>))}
-          </div>
+              <div className="card legend animate-fade">
+                <span className="card-label">{view === "protection" ? "% Protected" : "Gi* cluster"}</span>
+                {view === "protection"
+                  ? [[">= 25", "#1a9850"], ["15–25", "#91cf60"], ["7–15", "#d9ef8b"], ["2–7", "#fee08b"], ["0.5–2", "#fc8d59"], ["< 0.5", "#d73027"]].map(([label, c]) => (
+                      <div className="legend-row" key={label}><span className="swatch" style={{ background: c }} /> {label}</div>))
+                  : [["Hot spot (high)", "#c0392b"], ["Cold spot (low)", "#2980b9"], ["Not significant", "#d5d5d5"]].map(([label, c]) => (
+                      <div className="legend-row" key={label}><span className="swatch" style={{ background: c }} /> {label}</div>))}
+              </div>
 
-          <div className="footer-note">
-            Full analysis (clustering, spatial statistics) and methodology on{" "}
-            <a href="https://github.com/harshrastogii/nt-protected-areas" target="_blank" rel="noreferrer">GitHub</a>.
-          </div>
+              <div className="footer-note">
+                Full analysis (clustering, spatial statistics) and methodology on{" "}
+                <a href="https://github.com/harshrastogii/nt-protected-areas" target="_blank" rel="noreferrer">GitHub</a>.
+              </div>
+            </>
+          )}
         </aside>
       </div>
     </div>
