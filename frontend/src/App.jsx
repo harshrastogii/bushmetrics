@@ -411,8 +411,25 @@ export default function App() {
               </div>
 
               <div className="footer-note">
-                Full analysis (clustering, spatial statistics) and methodology on{" "}
-                <a href="https://github.com/harshrastogii/nt-protected-areas" target="_blank" rel="noreferrer">GitHub</a>.
+                <p className="fn-line">
+                  Full analysis (clustering, spatial statistics) and methodology on{" "}
+                  <a href="https://github.com/harshrastogii/nt-protected-areas" target="_blank" rel="noreferrer">GitHub</a>.
+                </p>
+
+                <div className="credit">
+                  <span className="credit-by">
+                    Built by{" "}
+                    <a href="https://www.harshrastogii.com/" target="_blank" rel="noreferrer">Harsh Rastogi</a>
+                  </span>
+                  <a className="kofi" href="https://ko-fi.com/harshrastogi" target="_blank" rel="noreferrer">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+                      <path d="M5 8h11a3 3 0 0 1 0 6h-1" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M3 8h13v5a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V8Z" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M7 2.5v1.5M10 2v2M13 2.5v1.5" strokeLinecap="round" />
+                    </svg>
+                    Support this project
+                  </a>
+                </div>
               </div>
             </>
           )}

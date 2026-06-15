@@ -367,3 +367,31 @@ header h1 {
   50%  { opacity: 0.45; }
   100% { opacity: 0.9; }
 }
+
+/* =========================================================================
+   FOOTER — credit (portfolio) + support (Ko-fi)
+   ========================================================================= */
+.footer-note .fn-line { margin: 0 0 14px; }
+
+.credit {
+  display: flex; flex-direction: column; gap: 10px;
+  padding-top: 14px; border-top: 1px solid var(--c-line-2);
+}
+.credit-by { font-size: var(--fs-xs); color: var(--c-muted-2); }
+.credit-by a {
+  color: var(--c-forest-800); font-weight: 600; text-decoration: none;
+  border-bottom: 1px solid #c5bfb0; transition: border-color var(--t-fast);
+}
+.credit-by a:hover { border-bottom-color: var(--c-forest-800); }
+
+.kofi {
+  display: inline-flex; align-items: center; gap: 8px; align-self: flex-start;
+  padding: 8px 14px; border-radius: var(--r-md);
+  border: 1px solid var(--c-line); background: var(--c-surface);
+  color: var(--c-ink-2); font-size: 12.5px; font-weight: 600; text-decoration: none;
+  transition: background var(--t-fast), border-color var(--t-fast), transform var(--t-fast), color var(--t-fast);
+}
+.kofi svg { width: 15px; height: 15px; color: var(--c-accent); transition: color var(--t-fast); }
+.kofi:hover { background: var(--c-forest-800); border-color: var(--c-forest-800); color: #fff; transform: translateY(-1px); }
+.kofi:hover svg { color: var(--c-accent); }
+.kofi:active { transform: translateY(0); }
