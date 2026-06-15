@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { MapContainer, TileLayer, GeoJSON, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, GeoJSON, useMap, CircleMarker, Tooltip } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import { getBioregions, askQuestion } from "./api";
 import "./App.css";
@@ -7,6 +7,42 @@ import "./App.css";
 const NT_AVERAGE = 5.1;
 const NT_CENTER = [-19.5, 133.5];
 const NT_ZOOM = 5;
+
+/* Ray-casting point-in-polygon. lng/lat point; ring = array of [lng,lat]. */
+function pointInRing(lng, lat, ring) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const xi = ring[i][0], yi = ring[i][1];
+    const xj = ring[j][0], yj = ring[j][1];
+    const intersect = (yi > lat) !== (yj > lat) &&
+      lng < ((xj - xi) * (lat - yi)) / (yj - yi) + xi;
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+/* Handles Polygon and MultiPolygon; respects holes (even-odd across rings). */
+function pointInFeature(lng, lat, geometry) {
+  if (!geometry) return false;
+  const polys = geometry.type === "Polygon" ? [geometry.coordinates]
+    : geometry.type === "MultiPolygon" ? geometry.coordinates : [];
+  for (const poly of polys) {
+    let within = false;
+    for (let r = 0; r < poly.length; r++) {
+      if (pointInRing(lng, lat, poly[r])) within = !within; // outer adds, holes subtract
+    }
+    if (within) return true;
+  }
+  return false;
+}
+
+function findRegionAt(lng, lat, geojson) {
+  if (!geojson || !geojson.features) return null;
+  for (const f of geojson.features) {
+    if (pointInFeature(lng, lat, f.geometry)) return f.properties;
+  }
+  return null;
+}
 
 function colorForPct(pct) {
   if (pct >= 25) return "#1a9850";
@@ -39,6 +75,15 @@ function MapController({ resetSignal }) {
   return null;
 }
 
+/* Fly to the user's location once it's found */
+function LocateController({ userPos }) {
+  const map = useMap();
+  useEffect(() => {
+    if (userPos) map.flyTo([userPos.lat, userPos.lng], 7, { duration: 0.8 });
+  }, [userPos, map]);
+  return null;
+}
+
 export default function App() {
   const [data, setData] = useState(null);
   const [selected, setSelected] = useState(null);
@@ -46,6 +91,11 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState("protection");
   const [resetSignal, setResetSignal] = useState(0);
+
+  // Geolocation state — opt-in, never stored or sent anywhere
+  const [userPos, setUserPos] = useState(null);     // {lat, lng, accuracy}
+  const [locating, setLocating] = useState(false);
+  const [locateMsg, setLocateMsg] = useState(null); // {tone, text}
 
   // Search state
   const [query, setQuery] = useState("");
@@ -77,6 +127,44 @@ export default function App() {
 
   function clearQuery() {
     setQuery(""); setAnswer(null); setHighlight(null);
+  }
+
+  function locateMe() {
+    if (!("geolocation" in navigator)) {
+      setLocateMsg({ tone: "bad", text: "Your browser doesn't support location." });
+      return;
+    }
+    setLocating(true);
+    setLocateMsg(null);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude: lat, longitude: lng, accuracy } = pos.coords;
+        setUserPos({ lat, lng, accuracy });
+        setLocating(false);
+        // Which bioregion am I in? Reuse the already-loaded GeoJSON.
+        const region = data ? findRegionAt(lng, lat, data) : null;
+        if (region) {
+          setSelected(region);
+          setLocateMsg({ tone: "good", text: `You're in ${region.GEO_ZONE}.` });
+        } else {
+          setLocateMsg({ tone: "warn", text: "You're outside the NT bioregions shown on this map." });
+        }
+      },
+      (err) => {
+        setLocating(false);
+        const text = err.code === err.PERMISSION_DENIED
+          ? "Location permission was denied. You can enable it in your browser's site settings."
+          : err.code === err.TIMEOUT
+          ? "Finding your location took too long. Try again."
+          : "Couldn't determine your location.";
+        setLocateMsg({ tone: "bad", text });
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  }
+
+  function clearLocation() {
+    setUserPos(null); setLocateMsg(null);
   }
 
   const styleFn = (feature) => {
@@ -178,17 +266,59 @@ export default function App() {
                 </svg>
                 Fit to NT
               </button>
+              <button onClick={locateMe} disabled={locating} aria-label="Find my location on the map">
+                {locating ? (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true" className="spin-svg">
+                    <path d="M12 3a9 9 0 1 0 9 9" strokeLinecap="round" />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                    <circle cx="12" cy="12" r="3" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3" strokeLinecap="round" />
+                  </svg>
+                )}
+                {locating ? "Locating…" : "Locate me"}
+              </button>
+              {userPos && (
+                <button onClick={clearLocation} aria-label="Remove my location marker">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                    <path d="M18 6 6 18M6 6l12 12" strokeLinecap="round" />
+                  </svg>
+                  Clear pin
+                </button>
+              )}
             </div>
           )}
 
           <MapContainer center={NT_CENTER} zoom={NT_ZOOM} style={{ height: "100%", width: "100%" }}>
             <MapController resetSignal={resetSignal} />
+            <LocateController userPos={userPos} />
             <TileLayer url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" attribution="&copy; OpenStreetMap &copy; CARTO" />
             {data && <GeoJSON key={view + (highlight ? "-hl" : "")} data={data} style={styleFn} onEachFeature={onEach} />}
+            {userPos && (
+              <>
+                <CircleMarker
+                  center={[userPos.lat, userPos.lng]}
+                  radius={8}
+                  pathOptions={{ color: "#1d4ed8", weight: 3, fillColor: "#3b82f6", fillOpacity: 0.9 }}
+                >
+                  <Tooltip direction="top" offset={[0, -8]}>You are here</Tooltip>
+                </CircleMarker>
+              </>
+            )}
           </MapContainer>
         </div>
 
         <aside className="panel" aria-label="Region details and legend">
+          {/* Location status — opt-in geolocation feedback */}
+          {locateMsg && (
+            <div className={`locate-msg ${locateMsg.tone} animate-fade`} role="status">
+              <span>{locateMsg.text}</span>
+              <button onClick={() => setLocateMsg(null)} aria-label="Dismiss location message">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" strokeLinecap="round" /></svg>
+              </button>
+            </div>
+          )}
+
           {/* Skeleton while the dataset loads */}
           {loading && (
             <div className="skeleton" aria-hidden="true">
