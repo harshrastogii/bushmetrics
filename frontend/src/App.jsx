@@ -251,7 +251,7 @@ export default function App() {
             <div className="loading" role="status">
               <div className="spinner" aria-hidden="true" />
               <div>Loading map data…</div>
-              <div className="sub-note">First load may take ~30s while the server wakes.</div>
+              <div className="sub-note">Loading region data — just a moment.</div>
             </div>
           )}
           {error && (
