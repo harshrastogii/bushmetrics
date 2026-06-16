@@ -203,7 +203,7 @@ export default function App() {
         <div className="header-text">
           <p className="eyebrow"><span className="dot" aria-hidden="true" /> Environmental Intelligence · Northern Territory</p>
           <h1 className="brand">
-            <span className="brand-name">Groundtruth</span>
+            <span className="brand-name">BushMetrics</span>
             <span className="brand-sub">Protected-Area Coverage Explorer</span>
           </h1>
           <p className="lede">

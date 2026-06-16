@@ -91,7 +91,7 @@ header h1 {
   margin: 0 0 8px; font-family: var(--ff-serif); font-size: var(--fs-h1);
   font-weight: 600; letter-spacing: -0.01em; line-height: 1.12;
 }
-/* Brand wordmark — Groundtruth as product name + descriptive subtitle */
+/* Brand wordmark — BushMetrics as product name + descriptive subtitle */
 header h1.brand { display: flex; flex-direction: column; gap: 2px; }
 .brand-name { font-family: var(--ff-serif); font-size: 28px; font-weight: 600; letter-spacing: -0.015em; line-height: 1.05; }
 .brand-sub {
