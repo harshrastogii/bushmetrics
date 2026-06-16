@@ -202,7 +202,10 @@ export default function App() {
       <header>
         <div className="header-text">
           <p className="eyebrow"><span className="dot" aria-hidden="true" /> Environmental Intelligence · Northern Territory</p>
-          <h1>Protected-Area Coverage Explorer</h1>
+          <h1 className="brand">
+            <span className="brand-name">Groundtruth</span>
+            <span className="brand-sub">Protected-Area Coverage Explorer</span>
+          </h1>
           <p className="lede">
             The NT protects its scenic northern country far more than its vast arid interior.
             This map shows how much of each region sits inside a <strong>park or reserve</strong>.

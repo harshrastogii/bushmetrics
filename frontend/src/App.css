@@ -91,6 +91,13 @@ header h1 {
   margin: 0 0 8px; font-family: var(--ff-serif); font-size: var(--fs-h1);
   font-weight: 600; letter-spacing: -0.01em; line-height: 1.12;
 }
+/* Brand wordmark — Groundtruth as product name + descriptive subtitle */
+header h1.brand { display: flex; flex-direction: column; gap: 2px; }
+.brand-name { font-family: var(--ff-serif); font-size: 28px; font-weight: 600; letter-spacing: -0.015em; line-height: 1.05; }
+.brand-sub {
+  font-family: var(--ff-sans); font-size: 13px; font-weight: 600;
+  letter-spacing: 0.02em; color: var(--c-accent); opacity: 0.95;
+}
 .lede { font-size: var(--fs-body); line-height: 1.45; margin: 0; max-width: 640px; opacity: 0.94; }
 .sub { font-size: var(--fs-sm); line-height: 1.4; margin: 6px 0 0; max-width: 640px; opacity: 0.72; }
 .sub strong, .lede strong { color: var(--c-accent); font-weight: 600; }
