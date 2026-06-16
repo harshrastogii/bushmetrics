@@ -1,6 +1,6 @@
-# Northern Territory Protected-Area Coverage
+# BushMetrics — Northern Territory Protected-Area Coverage
 
-**[🌐 Live app](https://nt-protected-areas.vercel.app/) · [🔌 API](https://nt-protected-areas-api.onrender.com) · [📖 API docs](https://nt-protected-areas-api.onrender.com/docs)**
+**[🌐 Live app](https://bushmetrics.vercel.app/) · [🔌 API](https://bushmetrics-api-975b47c8fabf.herokuapp.com) · [📖 API docs](https://bushmetrics-api-975b47c8fabf.herokuapp.com/docs)**
 
 A full-stack spatial data science project examining whether the Northern Territory's
 parks and reserves protect a representative cross-section of the Territory's land — or
@@ -10,9 +10,6 @@ whether protection is skewed toward certain landscapes while leaving others expo
 > scenic northern country and significantly under-protects the arid interior. The
 > Tanami — the Territory's single largest bioregion at ~538,000 km² — is a statistically
 > significant cold spot of protection at just **0.6%** coverage.
-
-> ⏳ *The live app's backend runs on a free tier that sleeps when idle, so the very
-> first map load may take ~30–50 seconds while the server wakes. It's fast after that.*
 
 ![Protection coverage by land class](figures/01_protection_by_class.png)
 
@@ -109,7 +106,7 @@ Davenport Murchison Range, MacDonnell Ranges).
 ```
 ┌─────────────────────┐      HTTPS / JSON      ┌──────────────────────┐
 │  React + Leaflet     │  ───────────────────▶  │  FastAPI (Python)     │
-│  frontend (Vercel)   │                        │  backend (Render)     │
+│  frontend (Vercel)   │                        │  backend (Heroku)     │
 │  interactive map     │  ◀───────────────────  │  serves analysis JSON │
 └─────────────────────┘                        └──────────────────────┘
 ```
@@ -164,7 +161,7 @@ To run the full analysis, download the three datasets from the NT Open Data Port
 ## Tools
 
 **Analysis:** Python · GeoPandas · scikit-learn · esda / libpysal (PySAL) · matplotlib
-**App:** FastAPI · React (Vite) · Leaflet · deployed on Render + Vercel
+**App:** FastAPI · React (Vite) · Leaflet · deployed on Heroku + Vercel
 
 ---
 

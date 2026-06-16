@@ -416,7 +416,7 @@ export default function App() {
               <div className="footer-note">
                 <p className="fn-line">
                   Full analysis (clustering, spatial statistics) and methodology on{" "}
-                  <a href="https://github.com/harshrastogii/nt-protected-areas" target="_blank" rel="noreferrer">GitHub</a>.
+                  <a href="https://github.com/harshrastogii/bushmetrics" target="_blank" rel="noreferrer">GitHub</a>.
                 </p>
 
                 <div className="credit">
