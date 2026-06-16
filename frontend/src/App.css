@@ -208,9 +208,9 @@ header h1.brand { display: flex; flex-direction: column; gap: 2px; }
 /* Coverage meter */
 .meter { height: 8px; border-radius: 6px; background: var(--c-surface-2); overflow: hidden; margin: 14px 0 6px; }
 .meter-fill { height: 100%; border-radius: 6px; transition: width var(--t-slow); }
-.meter-avg { position: relative; height: 14px; margin-bottom: 14px; overflow: hidden; }
-.meter-avg .tick { position: absolute; top: 0; width: 2px; height: 5px; background: var(--c-ink-2); }
-.meter-avg .tick-label { position: absolute; top: 5px; font-size: 10.5px; color: var(--c-muted); white-space: nowrap; transform: translateX(-50%); }
+.meter-avg { position: relative; height: 24px; margin-bottom: 10px; }
+.meter-avg .tick { position: absolute; top: 0; width: 2px; height: 6px; background: var(--c-ink-2); }
+.meter-avg .tick-label { position: absolute; top: 9px; font-size: 10.5px; line-height: 1; color: var(--c-muted); white-space: nowrap; transform: translateX(-50%); }
 
 .ref { font-size: var(--fs-xs); color: var(--c-faint); margin: 4px 0 18px; padding-bottom: 16px; border-bottom: 1px solid var(--c-line-2); }
 .meaning { font-size: 12.5px; line-height: 1.55; color: var(--c-muted); background: var(--c-surface-2); padding: 11px 13px; border-radius: var(--r-sm); margin: 0 0 18px; }
