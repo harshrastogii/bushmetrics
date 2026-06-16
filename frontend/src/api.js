@@ -1,5 +1,5 @@
 // Backend URL — Render in production, localhost for local dev
-const API_BASE = import.meta.env.VITE_API_BASE || "https://nt-protected-areas-api.onrender.com";
+const API_BASE = import.meta.env.VITE_API_BASE || "https://bushmetrics-api-975b47c8fabf.herokuapp.com";
 
 export async function getBioregions() {
   const res = await fetch(`${API_BASE}/bioregions`);
@@ -14,7 +14,7 @@ export async function getByClass() {
 }
 
 export async function askQuestion(question) {
-  const API_BASE = import.meta.env.VITE_API_BASE || "https://nt-protected-areas-api.onrender.com";
+  const API_BASE = import.meta.env.VITE_API_BASE || "https://bushmetrics-api-975b47c8fabf.herokuapp.com";
   const res = await fetch(`${API_BASE}/ask`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
