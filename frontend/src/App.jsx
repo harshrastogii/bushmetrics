@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { MapContainer, TileLayer, GeoJSON, useMap, CircleMarker, Tooltip } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import { getBioregions, askQuestion } from "./api";
@@ -67,9 +67,13 @@ function verdict(pct) {
 /* Imperatively fit the map back to the NT extent without disturbing map state */
 function MapController({ resetSignal }) {
   const map = useMap();
-  const first = useRef(true);
   useEffect(() => {
-    if (first.current) { first.current = false; return; }
+    // resetSignal starts at 0 and only increments on an explicit "Fit to NT".
+    // Guarding on the value (not a mutable ref) keeps this correct under
+    // StrictMode, which runs effects twice on mount.
+    if (resetSignal === 0) return;
+    const size = map.getSize();
+    if (!size.x || !size.y) { map.setView(NT_CENTER, NT_ZOOM); return; }
     map.flyTo(NT_CENTER, NT_ZOOM, { duration: 0.6 });
   }, [resetSignal, map]);
   return null;
@@ -79,7 +83,10 @@ function MapController({ resetSignal }) {
 function LocateController({ userPos }) {
   const map = useMap();
   useEffect(() => {
-    if (userPos) map.flyTo([userPos.lat, userPos.lng], 7, { duration: 0.8 });
+    if (!userPos) return;
+    const size = map.getSize();
+    if (!size.x || !size.y) { map.setView([userPos.lat, userPos.lng], 7); return; }
+    map.flyTo([userPos.lat, userPos.lng], 7, { duration: 0.8 });
   }, [userPos, map]);
   return null;
 }
@@ -292,10 +299,22 @@ export default function App() {
             </div>
           )}
 
-          <MapContainer center={NT_CENTER} zoom={NT_ZOOM} style={{ height: "100%", width: "100%" }}>
+          <MapContainer center={NT_CENTER} zoom={NT_ZOOM} maxZoom={16} style={{ height: "100%", width: "100%" }}>
             <MapController resetSignal={resetSignal} />
             <LocateController userPos={userPos} />
-            <TileLayer url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" attribution="&copy; OpenStreetMap &copy; CARTO" />
+            {/* Esri light-grey canvas: keyless, and matches the muted palette.
+                CARTO's free tiles now come stamped "API KEY REQUIRED".
+                Note Esri's tile path is {z}/{y}/{x}, not {z}/{x}/{y}. */}
+            <TileLayer
+              url="https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"
+              attribution="Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ"
+              maxZoom={16}
+            />
+            <TileLayer
+              url="https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}"
+              maxZoom={16}
+              zIndex={2}
+            />
             {data && <GeoJSON key={view + (highlight ? "-hl" : "")} data={data} style={styleFn} onEachFeature={onEach} />}
             {userPos && (
               <>
