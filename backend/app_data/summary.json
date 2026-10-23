@@ -1,0 +1,38 @@
+{
+  "source": "CAPAD 2024 (protected areas as at 30 June 2024); IBRA v7 bioregions",
+  "target_pct": 30,
+  "rank_min_nt_share": 0.1,
+  "nt_area_km2": 1347791.6,
+  "protected_km2": 331666.2,
+  "pct_protected": 24.61,
+  "by_governance_km2": {
+    "ipa": 260947.5,
+    "joint": 46178.9,
+    "government": 16642.0,
+    "private": 7897.8
+  },
+  "by_governance_pct_of_protected": {
+    "ipa": 78.68,
+    "joint": 13.92,
+    "government": 5.02,
+    "private": 2.38
+  },
+  "governance_labels": {
+    "ipa": "Indigenous Protected Area",
+    "joint": "Jointly managed with Traditional Owners",
+    "government": "Government managed",
+    "private": "Privately managed"
+  },
+  "n_bioregions": 25,
+  "n_meeting_target": 8,
+  "least_protected": {
+    "name": "Simpson Strzelecki Dunefields",
+    "pct_protected": 0.03,
+    "total_km2": 105747.6
+  },
+  "most_protected": {
+    "name": "Central Ranges",
+    "pct_protected": 93.81,
+    "total_km2": 26195.6
+  }
+}
