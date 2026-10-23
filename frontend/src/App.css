@@ -114,6 +114,7 @@ header h1.brand { display: flex; flex-direction: column; gap: 2px; }
 .hstat .hlabel { display: block; font-size: 11.5px; line-height: 1.3; margin-top: 8px; opacity: 0.8; }
 .hstat.best .hnum  { color: #9be3a8; }
 .hstat.worst .hnum { color: #f0a070; }
+.hstat.ipa .hnum   { color: #f5a07a; } /* lighter step of the IPA map colour, legible on forest green */
 
 /* =========================================================================
    TOOLBAR  — search + view toggle on their own row
@@ -208,6 +209,8 @@ header h1.brand { display: flex; flex-direction: column; gap: 2px; }
 /* Coverage meter */
 .meter { height: 8px; border-radius: 6px; background: var(--c-surface-2); overflow: hidden; margin: 14px 0 6px; }
 .meter-fill { height: 100%; border-radius: 6px; transition: width var(--t-slow); }
+.meter.stacked { display: flex; gap: 2px; height: 10px; }
+.meter-seg { height: 100%; flex: none; transition: width var(--t-slow); }
 .meter-avg { position: relative; height: 24px; margin-bottom: 10px; }
 .meter-avg .tick { position: absolute; top: 0; width: 2px; height: 6px; background: var(--c-ink-2); }
 .meter-avg .tick-label { position: absolute; top: 9px; font-size: 10.5px; line-height: 1; color: var(--c-muted); white-space: nowrap; transform: translateX(-50%); }
@@ -218,6 +221,10 @@ header h1.brand { display: flex; flex-direction: column; gap: 2px; }
 .stat:last-child { border-bottom: none; }
 .stat span { color: var(--c-muted); }
 .stat strong { font-weight: 600; color: var(--c-ink); }
+.gov-rows { margin-bottom: 14px; }
+.stat.gov span { display: flex; align-items: center; gap: 8px; color: var(--c-ink-2); }
+.stat.gov .swatch { width: 10px; height: 10px; border-radius: 3px; }
+.xborder { font-size: 12.5px; line-height: 1.55; color: var(--c-warn-fg); background: var(--c-warn-bg); padding: 10px 13px; border-radius: var(--r-sm); margin: 0 0 14px; }
 
 /* Hint / empty state */
 .hint {
@@ -232,6 +239,7 @@ header h1.brand { display: flex; flex-direction: column; gap: 2px; }
 
 /* Legend */
 .legend-row { display: flex; align-items: center; gap: 9px; font-size: var(--fs-sm); margin: 6px 0; color: var(--c-ink-2); }
+.legend-val { margin-left: auto; color: var(--c-muted); font-variant-numeric: tabular-nums; }
 .swatch { width: 16px; height: 16px; border-radius: 4px; flex-shrink: 0; border: 1px solid rgba(0,0,0,0.06); }
 
 .footer-note { margin-top: var(--sp-6); padding-top: var(--sp-4); border-top: 1px solid var(--c-line-2); font-size: var(--fs-xs); color: var(--c-muted-2); line-height: 1.5; }
@@ -254,6 +262,7 @@ header h1.brand { display: flex; flex-direction: column; gap: 2px; }
 .answer .aname { color: var(--c-ink); font-weight: 500; flex: 1; }
 .answer .apct { color: var(--c-forest-800); font-weight: 700; }
 .answer .amsg { margin: 0; font-size: var(--fs-sm); line-height: 1.55; color: var(--c-warn-fg); }
+.answer .anote { margin: 10px 0 0; font-size: 11.5px; line-height: 1.5; color: var(--c-muted); }
 .answer .ahint { display: block; margin-top: 10px; font-size: 11.5px; color: var(--c-faint); }
 
 /* =========================================================================
@@ -318,7 +327,9 @@ header h1.brand { display: flex; flex-direction: column; gap: 2px; }
   .search { max-width: 100%; }
 
   .layout { flex-direction: column; }
-  .map-wrap { height: 58vh; min-height: 340px; }
+  /* flex: none gives the map a definite height; with flex: 1 in a column of
+     auto height, Leaflet's height: 100% resolved to 0 and the map vanished. */
+  .map-wrap { flex: none; height: 58vh; min-height: 340px; }
   .panel { width: 100%; border-left: none; border-top: 1px solid var(--c-line); }
 }
 
@@ -327,7 +338,7 @@ header h1.brand { display: flex; flex-direction: column; gap: 2px; }
   .hstat { flex: 1 1 calc(50% - 5px); }
   .hero-stat .num { font-size: 44px; }
   .toggle { width: 100%; }
-  .toggle button { flex: 1; }
+  .toggle button { flex: 1; padding: 7px 8px; font-size: 12.5px; line-height: 1.25; }
   .search { flex-wrap: wrap; }
 }
 

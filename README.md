@@ -2,104 +2,103 @@
 
 **[🌐 Live app](https://bushmetrics.vercel.app/) · [🔌 API](https://bushmetrics-api-975b47c8fabf.herokuapp.com) · [📖 API docs](https://bushmetrics-api-975b47c8fabf.herokuapp.com/docs)**
 
-A full-stack spatial data science project examining whether the Northern Territory's
-parks and reserves protect a representative cross-section of the Territory's land — or
-whether protection is skewed toward certain landscapes while leaving others exposed.
+A full-stack spatial data project measuring how much of each Northern Territory
+bioregion sits inside a protected area, who manages that protection, and which regions
+fall short of the 30% global target.
 
-> **Headline finding:** The NT reserve network significantly over-represents rugged,
-> scenic northern country and significantly under-protects the arid interior. The
-> Tanami — the Territory's single largest bioregion at ~538,000 km² — is a statistically
-> significant cold spot of protection at just **0.6%** coverage.
-
-![Protection coverage by land class](figures/01_protection_by_class.png)
+> **Headline finding:** 24.6% of the NT is protected, and 78.7% of that protected land is
+> Indigenous Protected Areas. Another 13.9% is national parks jointly managed with
+> Traditional Owners, so Traditional Owners manage or co-manage 92.6% of the Territory's
+> protected estate. 8 of 25 bioregions meet the 30% target. The largest shortfalls run
+> through the pastoral middle of the Territory: Sturt Plateau (0.7%), Mitchell Grass Downs
+> (1.8%) and Davenport Murchison Ranges (2.2%).
 
 ---
 
-## What this project is
+## Version 2 (September 2026): what changed and why
 
-Two complementary deliverables built on the same analysis:
+The first version of this project reported the NT as 5.1% protected and the Tanami as
+0.6%. Both figures were wrong, for two reasons:
 
-1. **A Jupyter notebook** (`nt_protection_analysis.ipynb`) — the full analysis and
-   reasoning, from raw spatial files to statistical conclusion.
-2. **A deployed full-stack web app** — a FastAPI backend serving the analysis results
-   as JSON, and a React + Leaflet frontend with an interactive map you can explore by
-   bioregion, toggling between protection coverage and statistical hot/cold spots.
+1. **It counted NT parks and reserves only.** The protected-area layer was the NT
+   Government's parks dataset, which excludes Indigenous Protected Areas. IPAs make up
+   78.7% of the NT's protected estate, so the analysis missed most of it. The Tanami,
+   reported at 0.6%, is 48.5% protected: it contains the Southern Tanami IPA
+   (101,549 km², the NT's largest) and the Northern Tanami IPA.
+2. **Its regions were not IBRA bioregions.** The regions came from the `GEO_ZONE` field of
+   the NT Land Systems dataset. They carry IBRA-style names but draw different
+   boundaries: the old "Tanami" was 2.3 times the size of the IBRA Tanami bioregion's NT
+   portion, and the old "Simpson Strzelecki Dunefields" was a 23rd of it. That made the
+   results incomparable with published NT conservation research.
 
-## The question
-
-Protected-area networks are often shaped by scenery, accessibility, and history as much
-as by ecological need. This project asks a measurable version of that concern: **does
-protection coverage vary systematically by land type and by region, and is any pattern
-statistically real rather than incidental?**
+Version 2 rebuilds the data on CAPAD 2024 and IBRA v7, the same framework used by
+McGinley, Edwards & Garnett (2026), *Gaps in conservation planning in the Northern
+Territory of Australia: preparing for the energy transition*, Australasian Journal of
+Environmental Management 33(1): 30–47,
+[doi:10.1080/14486563.2025.2575948](https://doi.org/10.1080/14486563.2025.2575948).
 
 ## Data
 
-Three open datasets from the [NT Government Open Data Portal](https://data.nt.gov.au):
-
-| Dataset | Format | Contents |
+| Dataset | Source | Use |
 |---|---|---|
-| NT Land Systems (NTLS 1M) | ESRI Shapefile | 16,831 land-system polygons with landform, soil, vegetation and class attributes |
-| NT Parks and Reserves | ESRI Shapefile | 217 protected-area polygons with type and IUCN category |
-| NT Land Mass / Coastline | File Geodatabase | Territory boundary, used for context and validation |
+| CAPAD 2024, terrestrial, NT | DCCEEW [CAPAD FeatureServer](https://gis.environment.gov.au/gispubmap/rest/services/ogc_services/CAPAD/FeatureServer), `STATE='NT'` (282 polygons) | Protected areas and who manages them |
+| CAPAD 2024 NT summary | DCCEEW [`capad-2024-terrestrial-nt.xlsx`](https://www.dcceew.gov.au/environment/land/nrs/science/capad/2024) | Validation only |
+| IBRA v7 regions | [data.gov.au](https://data.gov.au/data/dataset/interim-biogeographic-regionalisation-for-australia-ibra-version-7-regions), split by state | Bioregion boundaries and national extent |
 
-All published in GDA94 (EPSG:4283); areas computed after reprojection to Australian
-Albers (EPSG:3577), an equal-area projection.
-
-*Data snapshot retrieved June 2026; the analysis and the live app reflect the portal as
-of that date. The underlying datasets (land systems, parks) are slow-changing, so the
-snapshot remains representative.*
+CAPAD 2024 records protected areas as at 30 June 2024. Its `GOVERNANCE` field gives the
+management categories the app shows: every NT IPA is coded `C` (community), jointly
+managed parks `J`, government-managed `G`, private `P`. The app uses CAPAD's own coding;
+nothing is reclassified.
 
 ## Method
 
-End to end, from raw spatial files to statistical conclusion:
+`analysis/build_bioregions.py` rebuilds everything in `backend/app_data/` from the raw
+downloads:
 
-1. **Data engineering** — load and reconcile two spatial formats (Shapefile + File
-   Geodatabase), reproject to an equal-area CRS, repair invalid geometries, and validate
-   computed areas against the known size of the Territory (~1.35M km² mapped against
-   ~1.42M km² total — the gap is unmapped water and tidal zones).
-2. **Protection by land class** — dissolve parks into a single protected-area layer (to
-   avoid double-counting overlaps), then intersect with land systems to measure the
-   protected fraction of each land class. Cross-validated by two independent routes that
-   agree to within ~5%.
-3. **Unsupervised learning** — structured features (bioregion + area) produced no
-   meaningful clusters (silhouette < 0.22), so the approach pivoted to **TF-IDF text
-   mining** of the free-text vegetation, soil and landform descriptions, yielding six
-   interpretable ecological land groupings.
-4. **Spatial statistics** — **Moran's I** to test whether protection is globally
-   clustered across bioregions, and **Getis-Ord Gi\*** to locate significant hot and
-   cold spots.
+1. Take the NT pieces of each IBRA v7 bioregion, and sum every state's pieces to get
+   each bioregion's national extent. The ratio is the share of the bioregion inside the
+   NT.
+2. Intersect the NT bioregions with CAPAD polygons in Australian Albers (EPSG:3577).
+   Features CAPAD flags `OVERLAP=2` lie entirely inside other features and are excluded,
+   exactly as CAPAD's own totals exclude them, so no area is counted twice.
+3. **Validate against DCCEEW's published table.** The script fails if any bioregion's
+   protected share differs from the published figure by 0.1 percentage points or more.
+   Current result: the largest difference is 0.006 points, and NT areas agree within
+   0.19%.
+4. Run Getis-Ord Gi\* on percent protected (Queen contiguity plus each region's nearest
+   neighbour, so island regions are not isolated; 9,999 permutations).
+5. Simplify geometry for the web. Shared borders are simplified together
+   (`shapely.coverage_simplify`) so neighbouring bioregions stay gap-free.
+
+**Cross-border bioregions.** Of the 25 IBRA bioregions in the NT, only seven lie entirely
+inside it. All figures describe the NT portion, and the app labels every cross-border
+region with its NT share. Bioregions where the NT holds under 10% (Mount Isa Inlier, Gulf
+Plains, Stony Plains, Channel Country) are kept on the map but left out of
+most/least-protected rankings, since their NT figures describe small fragments of
+bioregions managed mostly by other states.
 
 ## Key results
 
-### Protection is sharply uneven by land type
+| | km² | Share of NT protected estate |
+|---|---:|---:|
+| Indigenous Protected Areas | 260,948 | 78.7% |
+| Jointly managed with Traditional Owners | 46,179 | 13.9% |
+| Government managed | 16,642 | 5.0% |
+| Privately managed | 7,898 | 2.4% |
+| **Total protected** | **331,666** | **24.6% of the NT** |
 
-Against a Territory-wide average of ~5.1%, protection ranges from **33% for limestone
-hills** down to **0% for salt pans**. The pattern tracks terrain: elevated, rugged
-country is well protected, while flat arid country is barely covered. The two largest
-land classes in the Territory — desert sandplains and dunefields — are among the
-**least** protected.
+**Meet the 30% target (8):** Central Ranges (93.8%), Arnhem Plateau (75.0%), Great Sandy
+Desert (55.8%), Arnhem Coast (54.2%), Tanami (48.5%), Pine Creek (42.7%), Central Arnhem
+(34.1%), Darwin Coastal (30.9%).
 
-![Where protection falls](figures/02_protection_map.png)
+**Least protected** (excluding NT slivers): Simpson Strzelecki Dunefields (0.03%), Sturt
+Plateau (0.7%), Mitchell Grass Downs (1.8%), Davenport Murchison Ranges (2.2%), Finke
+(6.2%).
 
-### Text mining recovers six ecological land types
-
-Clustering the survey descriptions independently rediscovered the same divide. Five
-small, varied groupings (eucalypt woodlands, tidal/mangrove coast, Melaleuca wetlands,
-rugged sandstone, Callitris sandplains) ring the north and are protected at 7–17%. One
-dominant grouping — arid open woodland / spinifex — covers ~90% of the Territory and is
-protected at just **4.1%**.
-
-![Ecological clusters](figures/03_ecological_clusters.png)
-
-### The spatial pattern is statistically significant
-
-Global **Moran's I = 0.227 (p = 0.032)** — protection is significantly spatially
-clustered, though moderate rather than overwhelming. Local **Getis-Ord Gi\*** confirms
-significant high-protection hot spots in the Top End north (Pine Creek, Darwin Coastal,
-Arnhem Coast) and significant low-protection cold spots in the arid interior (Tanami,
-Davenport Murchison Range, MacDonnell Ranges).
-
-![Getis-Ord hot and cold spots](figures/04_hotspot_map.png)
+**Spatial clustering is weak at this scale.** Gi\* finds one significant hot spot
+(Central Arnhem) and one cold spot (Simpson Strzelecki Dunefields). At bioregion level,
+protection follows individual large IPAs more than regional clusters. Version 1 reported
+several hot and cold spots; those came from the parks-only data.
 
 ## Architecture
 
@@ -111,33 +110,46 @@ Davenport Murchison Range, MacDonnell Ranges).
 └─────────────────────┘                        └──────────────────────┘
 ```
 
-- **Backend** (`backend/`) — FastAPI serving three endpoints (`/bioregions`,
-  `/by-class`, `/by-cluster`) from pre-computed analysis output, with auto-generated
-  OpenAPI docs at `/docs`.
-- **Frontend** (`frontend/`) — React (Vite) + react-leaflet; choropleth map with a
-  toggle between protection-coverage and Gi\* hot/cold-spot views, click-to-inspect
-  bioregion stats.
+- **Backend** (`backend/`): FastAPI serving `/bioregions`, `/protected-areas`, `/summary`
+  and a natural-language `/ask` endpoint from pre-computed output. OpenAPI docs at
+  `/docs`. `/by-class` and `/by-cluster` still serve version 1 output (see Limitations).
+- **Frontend** (`frontend/`): React (Vite) + react-leaflet, with three map views
+  (percent protected, who manages it, Gi\* hot/cold spots) and click-to-inspect
+  bioregion detail.
 
-## Limitations and notes
+## Limitations
 
-- **Moderate clustering, honestly reported.** Moran's I is significant but moderate
-  (0.227); it would not survive a stricter p < 0.01 threshold.
-- **Cluster over-merging.** TF-IDF grouped the arid interior into a single cluster
-  because those land systems share similar survey vocabulary; in reality the desert
-  contains more variation than one cluster implies.
-- **Neighbourhood effects in Gi\*.** A few regions (e.g. Daly Basin, MacDonnell Ranges)
-  are flagged as hot/cold spots that look counter-intuitive on their own values — correct
-  behaviour, since Gi\* assesses a region together with its neighbours.
-- **Salt pans at 0%** may be genuinely unprotected or reflect small protected slivers
-  lost to water/gaps in the overlay; treated as a flagged edge case.
+- **Snapshot date.** CAPAD 2024 reflects 30 June 2024. IPAs dedicated since then,
+  including the Central Western Desert IPA declared in 2025, are not yet included.
+- **Bioregion level.** Averages hide variation inside bioregions: McGinley et al. find
+  Tanami subregions at 0% protection even though the bioregion as a whole is 48.5%.
+- **Area, not representativeness.** The 30% target is area-based. Whether protected
+  areas cover each ecosystem type is a separate question (see Future work).
+- **Version 1 endpoints.** `/by-class` and `/by-cluster` were computed from NT parks only
+  and exclude IPAs. They are not shown in the app. Recomputing them needs the NT Land
+  Systems source data.
+- **Gi\* with 25 units** has limited statistical power; treat the hot/cold view as
+  descriptive.
 
-## Future work
+## Future work (phase 2)
 
-- Re-cluster the arid interior at higher resolution.
-- Run Gi\* at the land-system polygon level rather than aggregated bioregions.
-- Weight protection by IUCN category, not just presence.
+- IBRA v7 subregions (61 in the NT), matching McGinley et al.'s resolution, validated
+  against their Table S1.
+- Ecosystem representativeness using NVIS v7 major vegetation sub-groups and the JANIS
+  15% threshold.
+- Context layers for pastoral leasehold, Aboriginal freehold and Native Title. These are
+  shown as land tenure, not counted as protection.
 
 ## Running locally
+
+**Rebuild the data** (optional; outputs are committed):
+```bash
+# download the IBRA v7 regions zip into data/raw/ibra7/ibra7_regions/,
+# the CAPAD NT polygons into data/raw/capad/capad2024_nt.geojson,
+# and the NT summary xlsx into data/raw/capad/ (see Data above)
+python analysis/build_bioregions.py
+```
+Needs geopandas, shapely ≥ 2.1, esda, libpysal, openpyxl.
 
 **Backend:**
 ```bash
@@ -152,18 +164,24 @@ uvicorn main:app --reload --port 8000
 ```bash
 cd frontend
 npm install
-npm run dev   # opens on http://localhost:5173
+VITE_API_BASE=http://localhost:8000 npm run dev   # opens on http://localhost:5173
 ```
 
-To run the full analysis, download the three datasets from the NT Open Data Portal
-(links above), unzip into `data/`, and run `nt_protection_analysis.ipynb` top to bottom.
+## Version 1: original analysis
+
+`nt_protection_analysis.ipynb` is the original analysis: protection by NT land class,
+TF-IDF clustering of land-system descriptions into six ecological groups, and Moran's I /
+Gi\* on land-system zones. Its methods still hold. Its protection figures do not, because
+they use NT parks only and exclude IPAs. The figures in `figures/` come from version 1.
 
 ## Tools
 
-**Analysis:** Python · GeoPandas · scikit-learn · esda / libpysal (PySAL) · matplotlib
+**Analysis:** Python · GeoPandas · Shapely · esda / libpysal (PySAL) · scikit-learn (v1)
 **App:** FastAPI · React (Vite) · Leaflet · deployed on Heroku + Vercel
 
 ---
 
-*Data: © Northern Territory Government, NT Open Data Portal, used under Creative Commons
-Attribution licence.*
+*Protected areas: Collaborative Australian Protected Areas Database (CAPAD) 2024, ©
+Commonwealth of Australia (DCCEEW), CC BY 4.0. Bioregions: IBRA v7, © Commonwealth of
+Australia, CC BY 4.0. Version 1 data: © Northern Territory Government, NT Open Data
+Portal, CC BY.*

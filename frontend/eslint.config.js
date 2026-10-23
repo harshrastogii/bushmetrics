@@ -5,7 +5,8 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  // ._* are macOS metadata files created on exFAT drives, not source
+  globalIgnores(['dist', '**/._*']),
   {
     files: ['**/*.{js,jsx}'],
     extends: [

@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { MapContainer, TileLayer, GeoJSON, useMap, CircleMarker, Tooltip } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
-import { getBioregions, askQuestion } from "./api";
+import { getBioregions, getProtectedAreas, getSummary, askQuestion } from "./api";
 import "./App.css";
 
-const NT_AVERAGE = 5.1;
+// CBD Kunming-Montreal Target 3 ("30 by 30"), the target McGinley et al. (2026) assess the NT against
+const TARGET_PCT = 30;
 const NT_CENTER = [-19.5, 133.5];
 const NT_ZOOM = 5;
 
@@ -44,25 +45,42 @@ function findRegionAt(lng, lat, geojson) {
   return null;
 }
 
+// Bins anchored on the 30% target and the superseded 17% Aichi target
+const PCT_BINS = [
+  [30, "#1a9850", "≥ 30% (meets target)"],
+  [17, "#91cf60", "17–30%"],
+  [10, "#d9ef8b", "10–17%"],
+  [5,  "#fee08b", "5–10%"],
+  [1,  "#fc8d59", "1–5%"],
+  [0,  "#d73027", "< 1%"],
+];
 function colorForPct(pct) {
-  if (pct >= 25) return "#1a9850";
-  if (pct >= 15) return "#91cf60";
-  if (pct >= 7)  return "#d9ef8b";
-  if (pct >= 2)  return "#fee08b";
-  if (pct >= 0.5) return "#fc8d59";
-  return "#d73027";
+  return PCT_BINS.find(([min]) => pct >= min)[1];
 }
+
+// Who manages each protected area, from CAPAD's GOVERNANCE field.
+// Palette validated all-pairs for colour-vision deficiency (dataviz validator).
+const GOVERNANCE = [
+  { key: "ipa",        color: "#eb6834", label: "Indigenous Protected Area" },
+  { key: "joint",      color: "#1baf7a", label: "Jointly managed with Traditional Owners" },
+  { key: "government", color: "#2a78d6", label: "Government managed" },
+  { key: "private",    color: "#4a3aa7", label: "Privately managed" },
+];
+const GOV_COLOR = Object.fromEntries(GOVERNANCE.map((g) => [g.key, g.color]));
 function colorForGi(gi) {
   if (gi === "Hot spot (high protection)") return "#c0392b";
   if (gi === "Cold spot (low protection)") return "#2980b9";
   return "#d5d5d5";
 }
-function verdict(pct) {
-  if (pct >= 20) return { text: "Very well protected", tone: "good" };
-  if (pct >= NT_AVERAGE) return { text: "Above the NT average", tone: "good" };
-  if (pct >= 1) return { text: "Below the NT average — under-protected", tone: "warn" };
+function verdict(pct, ntAverage) {
+  if (pct >= TARGET_PCT) return { text: `Meets the ${TARGET_PCT}% target`, tone: "good" };
+  if (pct >= ntAverage) return { text: `Above the NT average, short of ${TARGET_PCT}%`, tone: "warn" };
+  if (pct >= 1) return { text: "Below the NT average", tone: "warn" };
   return { text: "Almost no protection", tone: "bad" };
 }
+
+const fmtKm2 = (v) => `${Math.round(v).toLocaleString()} km²`;
+const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 /* Imperatively fit the map back to the NT extent without disturbing map state */
 function MapController({ resetSignal }) {
@@ -93,6 +111,8 @@ function LocateController({ userPos }) {
 
 export default function App() {
   const [data, setData] = useState(null);
+  const [areas, setAreas] = useState(null);      // CAPAD protected-area polygons
+  const [summary, setSummary] = useState(null);  // Territory-wide headline figures
   const [selected, setSelected] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -111,8 +131,8 @@ export default function App() {
   const [highlight, setHighlight] = useState(null);    // array of region names to highlight
 
   useEffect(() => {
-    getBioregions()
-      .then((d) => { setData(d); setLoading(false); })
+    Promise.all([getBioregions(), getProtectedAreas(), getSummary()])
+      .then(([d, a, s]) => { setData(d); setAreas(a); setSummary(s); setLoading(false); })
       .catch((e) => { setError(e.message); setLoading(false); });
   }, []);
 
@@ -152,7 +172,7 @@ export default function App() {
         const region = data ? findRegionAt(lng, lat, data) : null;
         if (region) {
           setSelected(region);
-          setLocateMsg({ tone: "good", text: `You're in ${region.GEO_ZONE}.` });
+          setLocateMsg({ tone: "good", text: `You're in ${region.name}.` });
         } else {
           setLocateMsg({ tone: "warn", text: "You're outside the NT bioregions shown on this map." });
         }
@@ -176,10 +196,14 @@ export default function App() {
 
   const styleFn = (feature) => {
     const p = feature.properties;
+    // In the governance view the bioregions become a quiet backdrop for the protected areas
+    if (view === "governance") {
+      return { fillColor: "#f4f1ea", weight: 1, color: "#8a8578", fillOpacity: 0.35 };
+    }
     const base = view === "protection" ? colorForPct(p.pct_protected) : colorForGi(p.gi_class);
     // If a search is active, dim everything not in the highlight set
     if (highlight) {
-      const isMatch = highlight.includes(p.GEO_ZONE);
+      const isMatch = highlight.includes(p.name);
       return {
         fillColor: base,
         weight: isMatch ? 2.5 : 0.5,
@@ -194,15 +218,35 @@ export default function App() {
     layer.on({
       click: () => setSelected(feature.properties),
       mouseover: (e) => e.target.setStyle({ weight: 3, color: "#000" }),
-      mouseout: (e) => e.target.setStyle({ weight: highlight && !highlight.includes(feature.properties.GEO_ZONE) ? 0.5 : 1, color: "#444" }),
+      mouseout: (e) => e.target.setStyle(styleFn(feature)),
     });
   };
 
-  const v = selected ? verdict(selected.pct_protected) : null;
-  // Meter scale capped at 35% (matches best-protected class) for readable bars
-  const meterMax = 35;
-  const meterPct = selected ? Math.min(100, (selected.pct_protected / meterMax) * 100) : 0;
-  const avgPct = (NT_AVERAGE / meterMax) * 100;
+  const areaStyle = (feature) => ({
+    fillColor: GOV_COLOR[feature.properties.governance],
+    fillOpacity: 0.7, color: "#fff", weight: 0.8,
+  });
+
+  const onEachArea = (feature, layer) => {
+    const p = feature.properties;
+    const gov = GOVERNANCE.find((g) => g.key === p.governance);
+    const kind = p.TYPE === gov.label ? p.TYPE : `${p.TYPE} · ${gov.label}`;
+    layer.bindTooltip(
+      `<strong>${p.NAME}</strong><br>${kind}<br>${fmtKm2(p.area_km2)}`,
+      { sticky: true, direction: "top" }
+    );
+    // A protected area sits on top of its bioregion, so route clicks through to it
+    layer.on("click", (e) => {
+      const region = findRegionAt(e.latlng.lng, e.latlng.lat, data);
+      if (region) setSelected(region);
+    });
+  };
+
+  const ntAverage = summary ? summary.pct_protected : 0;
+  const v = selected ? verdict(selected.pct_protected, ntAverage) : null;
+  const giCounts = data ? data.features.reduce((acc, f) => {
+    acc[f.properties.gi_class] = (acc[f.properties.gi_class] || 0) + 1; return acc;
+  }, {}) : {};
 
   return (
     <div className="app">
@@ -214,15 +258,25 @@ export default function App() {
             <span className="brand-sub">Protected-Area Coverage Explorer</span>
           </h1>
           <p className="lede">
-            The NT protects its scenic northern country far more than its vast arid interior.
-            This map shows how much of each region sits inside a <strong>park or reserve</strong>.
+            Almost a quarter of the NT sits inside a <strong>protected area</strong>, most of it
+            Indigenous Protected Areas and parks managed with Traditional Owners. The gaps run
+            through the pastoral middle of the Territory.
           </p>
         </div>
 
         <div className="header-stats" role="group" aria-label="Territory-wide summary statistics">
-          <div className="hstat animate-rise stagger-1"><span className="hnum">{NT_AVERAGE}%</span><span className="hlabel">Territory-wide average protection</span></div>
-          <div className="hstat best animate-rise stagger-2"><span className="hnum">33%</span><span className="hlabel">Best protected — limestone hills</span></div>
-          <div className="hstat worst animate-rise stagger-3"><span className="hnum">0.6%</span><span className="hlabel">Tanami — the NT's largest region</span></div>
+          <div className="hstat animate-rise stagger-1">
+            <span className="hnum">{summary ? `${summary.pct_protected.toFixed(1)}%` : "—"}</span>
+            <span className="hlabel">of the NT is protected</span>
+          </div>
+          <div className="hstat ipa animate-rise stagger-2">
+            <span className="hnum">{summary ? `${Math.round(summary.by_governance_pct_of_protected.ipa)}%` : "—"}</span>
+            <span className="hlabel">of that is Indigenous Protected Areas</span>
+          </div>
+          <div className="hstat animate-rise stagger-3">
+            <span className="hnum">{summary ? `${summary.n_meeting_target} of ${summary.n_bioregions}` : "—"}</span>
+            <span className="hlabel">bioregions meet the {TARGET_PCT}% target</span>
+          </div>
         </div>
       </header>
 
@@ -248,6 +302,7 @@ export default function App() {
 
         <div className="toggle" role="tablist" aria-label="Map view">
           <button role="tab" aria-selected={view === "protection"} className={view === "protection" ? "on" : ""} onClick={() => setView("protection")}>% Protected</button>
+          <button role="tab" aria-selected={view === "governance"} className={view === "governance" ? "on" : ""} onClick={() => setView("governance")}>Who manages it</button>
           <button role="tab" aria-selected={view === "hotspot"} className={view === "hotspot" ? "on" : ""} onClick={() => setView("hotspot")}>Hot / cold spots</button>
         </div>
       </div>
@@ -316,6 +371,9 @@ export default function App() {
               zIndex={2}
             />
             {data && <GeoJSON key={view + (highlight ? "-hl" : "")} data={data} style={styleFn} onEachFeature={onEach} />}
+            {areas && view === "governance" && (
+              <GeoJSON key="areas" data={areas} style={areaStyle} onEachFeature={onEachArea} />
+            )}
             {userPos && (
               <>
                 <CircleMarker
@@ -368,13 +426,14 @@ export default function App() {
               ) : (
                 <p className="amsg">{answer.message}</p>
               )}
+              {answer.note && <p className="anote">{answer.note}</p>}
               <span className="ahint">Matching regions are highlighted on the map.</span>
             </div>
           )}
 
           {selected ? (
-            <div className="card detail animate-rise" key={selected.GEO_ZONE}>
-              <h2>{selected.GEO_ZONE}</h2>
+            <div className="card detail animate-rise" key={selected.name}>
+              <h2>{selected.name}</h2>
               <div className={`verdict ${v.tone}`}>{v.text}</div>
               <div className="hero-stat">
                 <span className="num">{selected.pct_protected.toFixed(1)}</span>
@@ -382,22 +441,43 @@ export default function App() {
                 <span className="caption">protected</span>
               </div>
 
-              {/* Coverage meter with NT-average reference tick */}
-              <div className="meter" role="img" aria-label={`${selected.pct_protected.toFixed(1)} percent protected, on a scale to ${meterMax} percent`}>
-                <div className="meter-fill" style={{ width: `${meterPct}%`, background: colorForPct(selected.pct_protected) }} />
+              {/* Whole bar = the bioregion's NT area; segments = who manages the protected share */}
+              <div className="meter stacked" role="img"
+                aria-label={`${selected.pct_protected.toFixed(1)} percent protected, against a ${TARGET_PCT} percent target`}>
+                {GOVERNANCE.map((g) => {
+                  const w = (selected[`${g.key}_km2`] / selected.total_km2) * 100;
+                  return w >= 0.2 && <div key={g.key} className="meter-seg" style={{ width: `${w}%`, background: g.color }} />;
+                })}
               </div>
               <div className="meter-avg">
-                <div className="tick" style={{ left: `${avgPct}%` }} />
-                <div className="tick-label" style={{ left: `${avgPct}%` }}>NT avg {NT_AVERAGE}%</div>
+                <div className="tick" style={{ left: `${TARGET_PCT}%` }} />
+                <div className="tick-label" style={{ left: `${TARGET_PCT}%` }}>{TARGET_PCT}% target</div>
               </div>
 
-              <p className="meaning">
-                {selected.pct_protected.toFixed(1)}% of {selected.GEO_ZONE}'s land area sits inside a
-                national park or reserve. The remaining {(100 - selected.pct_protected).toFixed(1)}% has
-                no conservation protection status.
-              </p>
-              <div className="stat"><span>Total area</span><strong>{Math.round(selected.total_km2).toLocaleString()} km²</strong></div>
-              <div className="stat"><span>Protected area</span><strong>{Math.round(selected.protected_km2).toLocaleString()} km²</strong></div>
+              {selected.protected_km2 > 0 ? (
+                <div className="gov-rows">
+                  {GOVERNANCE.filter((g) => selected[`${g.key}_km2`] > 0).map((g) => (
+                    <div className="stat gov" key={g.key}>
+                      <span><i className="swatch" style={{ background: g.color }} aria-hidden="true" />{g.label}</span>
+                      <strong>{fmtKm2(selected[`${g.key}_km2`])}</strong>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="meaning">No part of this bioregion's NT area is in a protected area.</p>
+              )}
+
+              {selected.nt_share < 0.995 && (
+                <p className="xborder">
+                  {selected.nt_share < 0.5 ? "Only " : ""}
+                  {selected.nt_share < 0.01 ? "under 1" : Math.round(selected.nt_share * 100)}% of the {selected.name} bioregion
+                  lies in the NT ({fmtKm2(selected.national_km2)} in total). These figures describe the NT part.
+                  {!selected.rankable && " It's too small a slice to include in rankings."}
+                </p>
+              )}
+
+              <div className="stat"><span>Area in the NT</span><strong>{fmtKm2(selected.total_km2)}</strong></div>
+              <div className="stat"><span>Protected</span><strong>{fmtKm2(selected.protected_km2)}</strong></div>
               <div className="stat"><span>Statistical cluster</span><strong>{selected.gi_class}</strong></div>
             </div>
           ) : (
@@ -416,25 +496,44 @@ export default function App() {
             <>
               <div className="card explainer animate-fade">
                 <span className="card-label">What you're seeing</span>
-                {view === "protection" ? (
-                  <p>Each region is shaded by the share of its area inside a park or reserve. Green is well protected, red is barely protected. Most of the red sits in the arid south.</p>
-                ) : (
-                  <p>Statistically significant clusters (Getis-Ord Gi*). Red regions sit in a neighbourhood of high protection, blue in a neighbourhood of low protection, grey shows no significant pattern.</p>
+                {view === "protection" && (
+                  <p>Each IBRA bioregion is shaded by the share of its NT area inside a protected area:
+                    Indigenous Protected Areas, national parks and private reserves. Dark green meets
+                    the {TARGET_PCT}% target.</p>
+                )}
+                {view === "governance" && (
+                  <p>Protected areas coloured by who manages them. Traditional Owners dedicate
+                    Indigenous Protected Areas voluntarily, and most NT national parks are jointly
+                    managed with them. Hover an area for its name.</p>
+                )}
+                {view === "hotspot" && (
+                  <p>Statistically significant clusters (Getis-Ord Gi*). Only{" "}
+                    {plural(giCounts["Hot spot (high protection)"] || 0, "hot spot")} and{" "}
+                    {plural(giCounts["Cold spot (low protection)"] || 0, "cold spot")} reach
+                    significance. At bioregion scale, protection follows individual large IPAs more
+                    than regional clusters.</p>
                 )}
               </div>
 
               <div className="card legend animate-fade">
-                <span className="card-label">{view === "protection" ? "% Protected" : "Gi* cluster"}</span>
-                {view === "protection"
-                  ? [[">= 25", "#1a9850"], ["15–25", "#91cf60"], ["7–15", "#d9ef8b"], ["2–7", "#fee08b"], ["0.5–2", "#fc8d59"], ["< 0.5", "#d73027"]].map(([label, c]) => (
-                      <div className="legend-row" key={label}><span className="swatch" style={{ background: c }} /> {label}</div>))
-                  : [["Hot spot (high)", "#c0392b"], ["Cold spot (low)", "#2980b9"], ["Not significant", "#d5d5d5"]].map(([label, c]) => (
-                      <div className="legend-row" key={label}><span className="swatch" style={{ background: c }} /> {label}</div>))}
+                <span className="card-label">
+                  {{ protection: "% of NT area protected", governance: "Managed by", hotspot: "Gi* cluster" }[view]}
+                </span>
+                {view === "protection" && PCT_BINS.map(([, c, label]) => (
+                  <div className="legend-row" key={label}><span className="swatch" style={{ background: c }} /> {label}</div>))}
+                {view === "governance" && GOVERNANCE.map((g) => (
+                  <div className="legend-row" key={g.key}>
+                    <span className="swatch" style={{ background: g.color }} /> {g.label}
+                    {summary && <span className="legend-val">{summary.by_governance_pct_of_protected[g.key].toFixed(1)}%</span>}
+                  </div>))}
+                {view === "hotspot" && [["Hot spot (high)", "#c0392b"], ["Cold spot (low)", "#2980b9"], ["Not significant", "#d5d5d5"]].map(([label, c]) => (
+                  <div className="legend-row" key={label}><span className="swatch" style={{ background: c }} /> {label}</div>))}
               </div>
 
               <div className="footer-note">
                 <p className="fn-line">
-                  Full analysis (clustering, spatial statistics) and methodology on{" "}
+                  Protected areas: CAPAD 2024 (at 30 June 2024), DCCEEW, CC BY 4.0. Bioregions: IBRA v7.
+                  Target: CBD Kunming-Montreal Target 3. Methodology on{" "}
                   <a href="https://github.com/harshrastogii/bushmetrics" target="_blank" rel="noreferrer">GitHub</a>.
                 </p>
 
