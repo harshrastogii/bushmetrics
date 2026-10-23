@@ -37,8 +37,8 @@ OUT = ROOT / "backend" / "app_data"
 
 ALBERS = 3577          # GDA94 / Australian Albers, equal-area, metres
 TARGET_PCT = 30        # CBD Kunming-Montreal Target 3 ("30 by 30")
-SIMPLIFY_M = 1000      # web geometry tolerance for bioregions
-PA_SIMPLIFY_M = 250    # web geometry tolerance for protected areas
+SIMPLIFY_M = 100       # web geometry tolerance for bioregions (~37k vertices)
+PA_SIMPLIFY_M = 50     # finer: people zoom into individual parks
 
 # Bioregions where the NT holds only a sliver are excluded from
 # "most/least protected" rankings. Their NT figures are real but describe a

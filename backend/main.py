@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import json, os
@@ -14,8 +15,10 @@ app.add_middleware(
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
+# The map GeoJSON is ~1.6 MB raw; gzip cuts the transfer to roughly a quarter
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
-DATA = Path(__file__).parent / "app_data"
+DATA =Path(__file__).parent / "app_data"
 
 def load(name):
     with open(DATA / name) as f:
