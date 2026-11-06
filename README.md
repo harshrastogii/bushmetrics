@@ -67,7 +67,9 @@ downloads:
    0.19%.
 4. Run Getis-Ord Gi\* on percent protected (Queen contiguity plus each region's nearest
    neighbour, so island regions are not isolated; 9,999 permutations).
-5. Simplify geometry for the web. Shared borders are simplified together
+5. Simplify geometry for the web, after all statistics are computed on the full
+   geometry. Bioregions use a 100 m tolerance and protected areas 50 m, which keeps
+   coastlines and islands accurate when zoomed in. Shared borders are simplified together
    (`shapely.coverage_simplify`) so neighbouring bioregions stay gap-free.
 
 **Cross-border bioregions.** Of the 25 IBRA bioregions in the NT, only seven lie entirely
@@ -112,7 +114,8 @@ several hot and cold spots; those came from the parks-only data.
 
 - **Backend** (`backend/`): FastAPI serving `/bioregions`, `/protected-areas`, `/summary`
   and a natural-language `/ask` endpoint from pre-computed output. OpenAPI docs at
-  `/docs`. `/by-class` and `/by-cluster` still serve version 1 output (see Limitations).
+  `/docs`. Responses are gzipped, so the two map layers transfer as about 390 KB.
+  `/by-class` and `/by-cluster` still serve version 1 output (see Limitations).
 - **Frontend** (`frontend/`): React (Vite) + react-leaflet, with three map views
   (percent protected, who manages it, Gi\* hot/cold spots) and click-to-inspect
   bioregion detail.

@@ -1,16 +1,40 @@
-# React + Vite
+# BushMetrics frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React (Vite) + react-leaflet single-page app for [bushmetrics.vercel.app](https://bushmetrics.vercel.app/).
+See the [project README](../README.md) for the data, method and results.
 
-Currently, two official plugins are available:
+## Run
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+```bash
+npm install
+VITE_API_BASE=http://localhost:8000 npm run dev   # against a local API
+npm run dev                                       # against the live Heroku API
+npm run lint
+npm run build
+```
 
-## React Compiler
+`VITE_API_BASE` sets the API the app calls. Without it, `src/api.js` falls back to the
+live Heroku API.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Layout
 
-## Expanding the ESLint configuration
+- `src/App.jsx`: the whole app. Three map views (percent protected, who manages it,
+  Gi\* hot/cold spots), the region detail panel, natural-language search, geolocation.
+- `src/api.js`: calls to `/bioregions`, `/protected-areas`, `/summary` and `/ask`.
+- `src/App.css`: styles and design tokens.
+- `public/og-card-v2.jpg`: the link-preview image referenced from `index.html`. Give a
+  replacement a new filename, since social sites cache preview images by URL.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+Header figures come from `/summary`, so they update with the data and are not set in code.
+
+## Deploy
+
+Vercel builds this folder on every push to `main`. If a change needs new API endpoints,
+deploy the backend first (it also deploys from `main`, through Heroku), otherwise the
+new frontend briefly calls endpoints that don't exist yet.
+
+## Notes
+
+- Basemap: Esri World Light Gray (no key needed). CARTO tiles now require an API key.
+- `._*` files are macOS metadata created on the exFAT drive this repo lives on; ESLint
+  and git both ignore them.
