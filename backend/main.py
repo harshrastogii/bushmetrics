@@ -29,11 +29,15 @@ client = genai.Client(api_key=GEMINI_KEY) if GEMINI_KEY else None
 
 @app.get("/")
 def root():
-    return {"status": "ok", "endpoints": ["/bioregions", "/protected-areas", "/summary", "/by-class", "/by-cluster", "/ask"]}
+    return {"status": "ok", "endpoints": ["/bioregions", "/subregions", "/protected-areas", "/summary", "/by-class", "/by-cluster", "/ask"]}
 
 @app.get("/bioregions")
 def bioregions():
     return JSONResponse(load("bioregions.geojson"))
+
+@app.get("/subregions")
+def subregions():
+    return JSONResponse(load("subregions.geojson"))
 
 @app.get("/protected-areas")
 def protected_areas():
@@ -53,12 +57,16 @@ def by_cluster():
 
 class Question(BaseModel):
     question: str
+    # Which map the asker is looking at; answers use the same regions
+    level: str = "bioregion"
+
+LEVEL_FILES = {"bioregion": "bioregions.geojson", "subregion": "subregions.geojson"}
 
 VALID_METRICS = {"pct_protected", "total_km2", "protected_km2", "ipa_km2", "joint_km2"}
 VALID_GI = {"Hot spot (high protection)", "Cold spot (low protection)", "Not significant"}
 
-SYSTEM_PROMPT = """You translate a user's question about Northern Territory IBRA bioregions into a JSON filter.
-Available data per bioregion (NT portion only): name, pct_protected (percent of land in a protected area),
+SYSTEM_PROMPT = """You translate a user's question about Northern Territory regions (IBRA bioregions or subregions) into a JSON filter.
+Available data per region (NT portion only): name, pct_protected (percent of land in a protected area),
 total_km2, protected_km2, ipa_km2 (area in Indigenous Protected Areas), joint_km2 (area in parks jointly
 managed with Traditional Owners), meets_target (true if at least 30% protected),
 and gi_class (one of "Hot spot (high protection)", "Cold spot (low protection)", "Not significant").
@@ -102,9 +110,9 @@ def ask(q: Question):
 
     try:
         if not spec.get("answerable", False):
-            return {"ok": False, "message": "I can only answer questions about protection coverage, area, and hot/cold spots for NT bioregions. Try: 'which regions are least protected?'"}
+            return {"ok": False, "message": "I can only answer questions about protection coverage, area, and hot/cold spots for NT regions. Try: 'which regions are least protected?'"}
 
-        geo = load("bioregions.geojson")
+        geo = load(LEVEL_FILES.get(q.level, LEVEL_FILES["bioregion"]))
         rows = [f["properties"] for f in geo["features"]]
 
         gi = spec.get("gi_filter")
@@ -126,6 +134,8 @@ def ask(q: Question):
                     note = ("Left out of this ranking because only a sliver lies in the NT: "
                             + ", ".join(sorted(excluded)) + ".")
             order = spec.get("order", "descending")
+            # Many subregions tie at 0%; list the largest of a tie first, in either order
+            rows.sort(key=lambda r: r.get("total_km2", 0), reverse=True)
             rows.sort(key=lambda r: r.get(metric, 0), reverse=(order != "ascending"))
 
         limit = spec.get("limit", 5)
@@ -135,6 +145,7 @@ def ask(q: Question):
 
         results = [{
             "name": r["name"],
+            "bioregion": r.get("bioregion"),  # parent bioregion; absent at bioregion level
             "pct_protected": round(r["pct_protected"], 1),
             "total_km2": round(r["total_km2"]),
             "gi_class": r["gi_class"],
