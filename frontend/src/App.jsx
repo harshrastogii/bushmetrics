@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { MapContainer, TileLayer, GeoJSON, useMap, CircleMarker, Tooltip } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import { getBioregions, getProtectedAreas, getSummary, askQuestion } from "./api";
@@ -7,7 +7,9 @@ import "./App.css";
 // CBD Kunming-Montreal Target 3 ("30 by 30"), the target McGinley et al. (2026) assess the NT against
 const TARGET_PCT = 30;
 const NT_CENTER = [-19.5, 133.5];
-const NT_ZOOM = 5;
+const NT_ZOOM = 5;  // starting view only; MapController then fits NT_BOUNDS
+const NT_BOUNDS = [[-26.0, 129.0], [-10.9, 138.0]];  // extent of the bioregion data
+const FIT_PADDING = [16, 16];
 
 /* Ray-casting point-in-polygon. lng/lat point; ring = array of [lng,lat]. */
 function pointInRing(lng, lat, ring) {
@@ -82,17 +84,59 @@ function verdict(pct, ntAverage) {
 const fmtKm2 = (v) => `${Math.round(v).toLocaleString()} km²`;
 const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
-/* Imperatively fit the map back to the NT extent without disturbing map state */
+/* Frame the NT to the map's actual size: on load, and on "Fit to NT" */
 function MapController({ resetSignal }) {
   const map = useMap();
+  // Keep re-framing the NT as the layout settles, until the visitor moves the map
+  const auto = useRef(true);
+  const programmatic = useRef(false);
+
+  // A fixed zoom suits one screen size: on a large monitor it left the NT a
+  // small shape in a map of half the Asia-Pacific. Leaflet also measures its
+  // container only on window resize, so when the header reflows after web
+  // fonts load, the map kept a stale size: the wrong framing, and grey untiled
+  // strips at the edge. Watching the container itself fixes both.
+  useEffect(() => {
+    let fittedTo = "";
+    const fit = () => {
+      const size = map.getSize();
+      // Fitting a 0x0 map divides by zero and yields NaN coordinates
+      if (!size.x || !size.y) return;
+      // The observer also fires once on attach; re-fitting an unchanged size
+      // would only make the map redraw its tiles
+      const key = `${size.x}x${size.y}`;
+      if (key === fittedTo) return;
+      fittedTo = key;
+      programmatic.current = true;
+      map.fitBounds(NT_BOUNDS, { padding: FIT_PADDING, animate: false });
+      programmatic.current = false;
+    };
+    const onMoveStart = () => { if (!programmatic.current) auto.current = false; };
+    map.on("movestart", onMoveStart);
+    fit();
+
+    // Re-frames on every container size change. Observers only run when the
+    // browser renders a frame, so the immediate fit above covers a page that
+    // loads in a background tab.
+    const ro = new ResizeObserver(() => {
+      map.invalidateSize({ pan: false });
+      if (auto.current) fit();
+    });
+    ro.observe(map.getContainer());
+    return () => { ro.disconnect(); map.off("movestart", onMoveStart); };
+  }, [map]);
+
   useEffect(() => {
     // resetSignal starts at 0 and only increments on an explicit "Fit to NT".
     // Guarding on the value (not a mutable ref) keeps this correct under
     // StrictMode, which runs effects twice on mount.
     if (resetSignal === 0) return;
     const size = map.getSize();
-    if (!size.x || !size.y) { map.setView(NT_CENTER, NT_ZOOM); return; }
-    map.flyTo(NT_CENTER, NT_ZOOM, { duration: 0.6 });
+    if (!size.x || !size.y) return;
+    programmatic.current = true;
+    map.flyToBounds(NT_BOUNDS, { padding: FIT_PADDING, duration: 0.6 });
+    programmatic.current = false;
+    auto.current = true;
   }, [resetSignal, map]);
   return null;
 }
